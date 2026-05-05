@@ -7,9 +7,28 @@ function getGenAI() {
   return new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_KEY);
 }
 
+function normalizeAIError(error) {
+  const message = error?.message || "";
+
+  if (/not found for API version|is not found for API version/i.test(message)) {
+    return new Error(
+      "Configured Gemini model is unavailable. Set GEMINI_MODEL to a supported model (for example: gemini-2.0-flash)."
+    );
+  }
+
+  if (/api key|permission denied|unauthenticated|403/i.test(message)) {
+    return new Error(
+      "Gemini API authentication failed. Verify GOOGLE_GEMINI_KEY and model access permissions."
+    );
+  }
+
+  return new Error(`AI provider error: ${message || "Unknown failure from Gemini API."}`);
+}
+
 function getReviewModel() {
+  const modelName = process.env.GEMINI_MODEL || "gemini-2.0-flash";
   return getGenAI().getGenerativeModel({
-    model: "gemini-2.5-flash-lite",
+    model: modelName,
     systemInstruction: `
 You are a Senior Software Engineer with 7+ years of experience in professional software development and code reviews. You act as a **strict, detail-oriented, but pragmatic code reviewer**. Your job is to **thoroughly review the code**, detect all meaningful improvements, but also **recognize when the code is already clean, efficient, and production-ready**.
 
@@ -46,7 +65,7 @@ CRITICAL: Always end your response with EXACTLY this JSON block on a new line:
 SCORE_JSON:{"overall":85,"bugs":2,"performance":3,"security":1,"style":4}
 (Replace the numbers with your actual assessment: overall 0-100, others are count of issues found)
 `
-  });
+  }, { apiVersion: "v1" });
 }
 
 /**
@@ -56,21 +75,26 @@ SCORE_JSON:{"overall":85,"bugs":2,"performance":3,"security":1,"style":4}
  * @param {string} language - The programming language
  */
 async function* streamReview(code, language) {
-  const model = getReviewModel();
-  const prompt = `Language: ${language}\n\nCode to review:\n${code}`;
-  const result = await model.generateContentStream(prompt);
+  try {
+    const model = getReviewModel();
+    const prompt = `Language: ${language}\n\nCode to review:\n${code}`;
+    const result = await model.generateContentStream(prompt);
 
-  for await (const chunk of result.stream) {
-    const text = chunk.text();
-    if (text) {
-      yield text;
+    for await (const chunk of result.stream) {
+      const text = chunk.text();
+      if (text) {
+        yield text;
+      }
     }
+  } catch (error) {
+    throw normalizeAIError(error);
   }
 }
 
 function getSecurityModel() {
+  const modelName = process.env.GEMINI_MODEL || "gemini-2.0-flash";
   return getGenAI().getGenerativeModel({
-    model: "gemini-2.5-flash-lite",
+    model: modelName,
     systemInstruction: `You are a security-focused code auditor specializing in the OWASP Top 10.
 Analyze the provided code for security vulnerabilities. For each issue found:
 1. Name the OWASP category (e.g., A01:2021 Broken Access Control)
@@ -81,7 +105,7 @@ Analyze the provided code for security vulnerabilities. For each issue found:
 Format: use ## for each issue, bold the OWASP category.
 End with SECURITY_SCORE_JSON:{"score":72,"critical":1,"high":2,"medium":3,"low":1}
 If no issues found, say the code passes basic OWASP checks and score 95+`
-  });
+  }, { apiVersion: "v1" });
 }
 
 /**
@@ -91,15 +115,19 @@ If no issues found, say the code passes basic OWASP checks and score 95+`
  * @param {string} language - The programming language
  */
 async function* streamSecurityScan(code, language) {
-  const securityModel = getSecurityModel();
-  const prompt = `Language: ${language}\n\nCode to review:\n${code}`;
-  const result = await securityModel.generateContentStream(prompt);
+  try {
+    const securityModel = getSecurityModel();
+    const prompt = `Language: ${language}\n\nCode to review:\n${code}`;
+    const result = await securityModel.generateContentStream(prompt);
 
-  for await (const chunk of result.stream) {
-    const text = chunk.text();
-    if (text) {
-      yield text;
+    for await (const chunk of result.stream) {
+      const text = chunk.text();
+      if (text) {
+        yield text;
+      }
     }
+  } catch (error) {
+    throw normalizeAIError(error);
   }
 }
 
