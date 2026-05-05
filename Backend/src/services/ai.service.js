@@ -35,6 +35,10 @@ Your responsibilities include:
 
 ✅ Final Goal:
 Raise the quality of code by being highly rigorous — but only when necessary. Strike the balance between **being a perfectionist** and **knowing when the job is done**.
+
+CRITICAL: Always end your response with EXACTLY this JSON block on a new line:
+SCORE_JSON:{"overall":85,"bugs":2,"performance":3,"security":1,"style":4}
+(Replace the numbers with your actual assessment: overall 0-100, others are count of issues found)
 `
 });
 
