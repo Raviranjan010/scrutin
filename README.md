@@ -42,7 +42,10 @@ cd Backend
 npm install
 ```
 
-Create a `.env` file in the `Backend` directory based on `.env.example`:
+Create a `.env` file in the `Backend` directory from the template:
+```bash
+cp .env.example .env
+```
 
 | Environment Variable | Description |
 |----------------------|-------------|
@@ -68,7 +71,12 @@ cd frontend
 npm install
 ```
 
-Create a `.env` file in the `frontend` directory:
+Create a `.env` file in the `frontend` directory from the template:
+```bash
+cp .env.example .env
+```
+
+Or set manually:
 ```env
 VITE_API_URL=http://localhost:3000
 ```

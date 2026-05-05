@@ -1,10 +1,16 @@
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_KEY);
+function getGenAI() {
+  if (!process.env.GOOGLE_GEMINI_KEY) {
+    throw new Error("GOOGLE_GEMINI_KEY is not configured on the backend.");
+  }
+  return new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_KEY);
+}
 
-const model = genAI.getGenerativeModel({
-  model: "gemini-2.5-flash-lite",
-  systemInstruction: `
+function getReviewModel() {
+  return getGenAI().getGenerativeModel({
+    model: "gemini-2.5-flash-lite",
+    systemInstruction: `
 You are a Senior Software Engineer with 7+ years of experience in professional software development and code reviews. You act as a **strict, detail-oriented, but pragmatic code reviewer**. Your job is to **thoroughly review the code**, detect all meaningful improvements, but also **recognize when the code is already clean, efficient, and production-ready**.
 
 Your responsibilities include:
@@ -40,7 +46,8 @@ CRITICAL: Always end your response with EXACTLY this JSON block on a new line:
 SCORE_JSON:{"overall":85,"bugs":2,"performance":3,"security":1,"style":4}
 (Replace the numbers with your actual assessment: overall 0-100, others are count of issues found)
 `
-});
+  });
+}
 
 /**
  * Stream a code review from Gemini.
@@ -49,6 +56,7 @@ SCORE_JSON:{"overall":85,"bugs":2,"performance":3,"security":1,"style":4}
  * @param {string} language - The programming language
  */
 async function* streamReview(code, language) {
+  const model = getReviewModel();
   const prompt = `Language: ${language}\n\nCode to review:\n${code}`;
   const result = await model.generateContentStream(prompt);
 
@@ -60,9 +68,10 @@ async function* streamReview(code, language) {
   }
 }
 
-const securityModel = genAI.getGenerativeModel({
-  model: "gemini-2.5-flash-lite",
-  systemInstruction: `You are a security-focused code auditor specializing in the OWASP Top 10.
+function getSecurityModel() {
+  return getGenAI().getGenerativeModel({
+    model: "gemini-2.5-flash-lite",
+    systemInstruction: `You are a security-focused code auditor specializing in the OWASP Top 10.
 Analyze the provided code for security vulnerabilities. For each issue found:
 1. Name the OWASP category (e.g., A01:2021 Broken Access Control)
 2. Severity: CRITICAL / HIGH / MEDIUM / LOW
@@ -72,7 +81,8 @@ Analyze the provided code for security vulnerabilities. For each issue found:
 Format: use ## for each issue, bold the OWASP category.
 End with SECURITY_SCORE_JSON:{"score":72,"critical":1,"high":2,"medium":3,"low":1}
 If no issues found, say the code passes basic OWASP checks and score 95+`
-});
+  });
+}
 
 /**
  * Stream a security scan from Gemini.
@@ -81,6 +91,7 @@ If no issues found, say the code passes basic OWASP checks and score 95+`
  * @param {string} language - The programming language
  */
 async function* streamSecurityScan(code, language) {
+  const securityModel = getSecurityModel();
   const prompt = `Language: ${language}\n\nCode to review:\n${code}`;
   const result = await securityModel.generateContentStream(prompt);
 

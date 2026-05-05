@@ -10,9 +10,21 @@ const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 
 const app = express()
+app.set('trust proxy', 1)
 
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  origin: (origin, callback) => {
+    const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:5173')
+      .split(',')
+      .map((value) => value.trim())
+      .filter(Boolean);
+
+    if (!origin || allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    return callback(new Error('Not allowed by CORS'));
+  },
   credentials: true
 }))
 
@@ -24,7 +36,11 @@ app.use(express.json())
 app.use(session({ 
   secret: process.env.SESSION_SECRET || 'secret', 
   resave: false, 
-  saveUninitialized: false 
+  saveUninitialized: false,
+  cookie: {
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    secure: process.env.NODE_ENV === 'production'
+  }
 }));
 app.use(passport.initialize());
 app.use(passport.session());

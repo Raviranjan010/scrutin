@@ -2,6 +2,30 @@ const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
+function createToken(user) {
+  return jwt.sign({ id: user._id }, process.env.JWT_SECRET || 'secret', { expiresIn: '7d' });
+}
+
+function serializeUser(user) {
+  const usage = user.usage instanceof Map ? Object.fromEntries(user.usage) : (user.usage || {});
+  return {
+    id: user._id,
+    email: user.email,
+    username: user.username,
+    provider: user.provider,
+    isPro: user.isPro,
+    usage
+  };
+}
+
+function getGithubEmail(profile) {
+  const primaryEmail = profile.emails && profile.emails.find((email) => email.value)?.value;
+  if (primaryEmail) return primaryEmail;
+
+  const username = profile.username || profile.displayName || `github-${profile.id}`;
+  return `${username}@users.noreply.github.com`.toLowerCase();
+}
+
 module.exports.signUp = async (email, password) => {
   const existingUser = await User.findOne({ email });
   if (existingUser) {
@@ -15,7 +39,10 @@ module.exports.signUp = async (email, password) => {
     provider: 'local'
   });
 
-  return { id: newUser._id, email: newUser.email, isPro: newUser.isPro };
+  return {
+    token: createToken(newUser),
+    user: serializeUser(newUser)
+  };
 };
 
 module.exports.signIn = async (email, password) => {
@@ -30,16 +57,9 @@ module.exports.signIn = async (email, password) => {
     throw new Error('Invalid email or password');
   }
 
-  const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET || 'secret', { expiresIn: '7d' });
-  
   return { 
-    token, 
-    user: { 
-      id: user._id, 
-      email: user.email, 
-      isPro: user.isPro, 
-      usage: Object.fromEntries(user.usage || new Map()) 
-    } 
+    token: createToken(user), 
+    user: serializeUser(user)
   };
 };
 
@@ -48,7 +68,7 @@ module.exports.verifyToken = async (token) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret');
     const user = await User.findById(decoded.id);
     if (!user) throw new Error('User not found');
-    return user;
+    return serializeUser(user);
   } catch (e) {
     throw new Error('Invalid token');
   }
@@ -58,7 +78,7 @@ module.exports.githubCallback = async (profile) => {
   let user = await User.findOne({ githubId: profile.id });
 
   if (!user) {
-    const email = profile.emails && profile.emails[0] ? profile.emails[0].value : null;
+    const email = getGithubEmail(profile);
     if (email) {
       user = await User.findOne({ email });
     }
@@ -76,15 +96,9 @@ module.exports.githubCallback = async (profile) => {
     }
   }
 
-  const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET || 'secret', { expiresIn: '7d' });
   return { 
-    token, 
-    user: { 
-      id: user._id, 
-      email: user.email, 
-      isPro: user.isPro, 
-      usage: Object.fromEntries(user.usage || new Map()) 
-    } 
+    token: createToken(user), 
+    user: serializeUser(user)
   };
 };
 
@@ -101,4 +115,3 @@ module.exports.updateUserUsage = async (userId) => {
 module.exports.getUserById = async (userId) => {
   return await User.findById(userId);
 };
-

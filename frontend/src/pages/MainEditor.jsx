@@ -15,6 +15,7 @@ import { useLocation } from 'react-router-dom'
 
 import { useReviewHistory } from '../hooks/useReviewHistory'
 import { useAuth } from '../hooks/useAuth'
+import { apiFetch } from '../lib/api'
 import HistorySidebar from '../components/HistorySidebar'
 import ScoreRing from '../components/ScoreRing'
 import ShareButton from '../components/ShareButton'
@@ -161,8 +162,8 @@ export default function MainEditor() {
     let parsedReviewId = null
 
     try {
-      const endpoint = scanMode === 'security' ? `${import.meta.env.VITE_API_URL}/ai/security-scan` : `${import.meta.env.VITE_API_URL}/ai/get-review`
-      const response = await fetch(endpoint, {
+      const endpoint = scanMode === 'security' ? '/ai/security-scan' : '/ai/get-review'
+      const response = await apiFetch(endpoint, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -210,7 +211,7 @@ export default function MainEditor() {
       finishReview(fullText, parsedReviewId)
     } catch (error) {
       console.error('Error reviewing code:', error)
-      setReview('## Error\nUnable to get code review. Please try again.')
+      setReview(`## Error\n${error.message || 'Unable to get code review. Please try again.'}`)
       setIsStreaming(false)
       setIsLoading(false)
     }

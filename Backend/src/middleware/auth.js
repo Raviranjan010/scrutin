@@ -1,6 +1,6 @@
 const { verifyToken } = require('../services/auth.service');
 
-module.exports.authMiddleware = (req, res, next) => {
+module.exports.authMiddleware = async (req, res, next) => {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return res.status(401).json({ error: 'Unauthorized: Missing or invalid token' });
@@ -8,7 +8,7 @@ module.exports.authMiddleware = (req, res, next) => {
 
   const token = authHeader.split(' ')[1];
   try {
-    const user = verifyToken(token);
+    const user = await verifyToken(token);
     req.user = user;
     next();
   } catch (error) {

@@ -6,6 +6,7 @@ import 'highlight.js/styles/github-dark.css';
 
 import ScoreRing from '../components/ScoreRing';
 import ExportDropdown from '../components/ExportDropdown';
+import { apiFetch } from '../lib/api';
 
 export default function ReviewPage() {
   const { id } = useParams();
@@ -17,7 +18,7 @@ export default function ReviewPage() {
   useEffect(() => {
     async function fetchReview() {
       try {
-        const res = await fetch(`${import.meta.env.VITE_API_URL}/reviews/${id}`);
+        const res = await apiFetch(`/reviews/${id}`);
         if (!res.ok) {
           throw new Error('Review not found');
         }
