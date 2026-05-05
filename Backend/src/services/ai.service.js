@@ -1,11 +1,12 @@
-const { GoogleGenerativeAI } = require("@google/generative-ai");
-
 const API_KEY =
   process.env.GOOGLE_GEMINI_KEY ||
+  process.env.GOOGLE_GEMINI_API_KEY ||
   process.env.GEMINI_API_KEY ||
   process.env.GOOGLE_API_KEY;
 
 const MODEL_NAME = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+const GEMINI_API_VERSION = process.env.GEMINI_API_VERSION || "v1beta";
+const GEMINI_TIMEOUT_MS = Number(process.env.GEMINI_TIMEOUT_MS || 60000);
 
 const reviewInstruction = `
 You are a Senior Software Engineer with 7+ years of experience in professional software development and code reviews.
@@ -72,32 +73,128 @@ function ensureApiKey() {
   }
 }
 
-function createModel(systemInstruction) {
-  ensureApiKey();
+function parseGeminiText(data) {
+  const text = data?.candidates?.[0]?.content?.parts
+    ?.map((part) => part.text || "")
+    .join("")
+    .trim();
 
-  const genAI = new GoogleGenerativeAI(API_KEY);
-  return genAI.getGenerativeModel({
-    model: MODEL_NAME,
-    systemInstruction,
-  });
-}
-
-function getGeminiErrorMessage(error) {
-  if (error?.message) {
-    if (/API key not valid|invalid api key/i.test(error.message)) {
-      return "Gemini API key is invalid. Check GOOGLE_GEMINI_KEY in the backend environment.";
-    }
-
-    if (/not found|not supported|is not found/i.test(error.message)) {
-      return `Gemini model "${MODEL_NAME}" is unavailable. Set GEMINI_MODEL to a supported model.`;
-    }
-
-    if (/quota|rate limit|429/i.test(error.message)) {
-      return "Gemini quota or rate limit was reached. Please try again later.";
-    }
+  if (text) {
+    return text;
   }
 
-  return "Failed to generate AI response. Please try again.";
+  const blockReason =
+    data?.promptFeedback?.blockReason ||
+    data?.candidates?.[0]?.finishReason;
+
+  if (blockReason) {
+    throw createServiceError(
+      502,
+      `Gemini did not return review text. Finish reason: ${blockReason}.`
+    );
+  }
+
+  throw createServiceError(502, "Gemini returned an empty response.");
+}
+
+function getGeminiStatusCode(statusCode) {
+  if (statusCode === 400) return 400;
+  if (statusCode === 401 || statusCode === 403) return 503;
+  if (statusCode === 404) return 503;
+  if (statusCode === 429) return 429;
+  return 502;
+}
+
+function getGeminiErrorMessage(statusCode, message) {
+  if (/API key not valid|invalid api key/i.test(message)) {
+    return "Gemini API key is invalid. Check GOOGLE_GEMINI_KEY in the backend environment.";
+  }
+
+  if (/not found|not supported|is not found/i.test(message)) {
+    return `Gemini model "${MODEL_NAME}" is unavailable. Set GEMINI_MODEL to a supported model.`;
+  }
+
+  if (/quota|rate limit|429/i.test(message) || statusCode === 429) {
+    return "Gemini quota or rate limit was reached. Please try again later.";
+  }
+
+  if (message) {
+    return `Gemini request failed: ${message}`;
+  }
+
+  return "Gemini request failed. Please check the backend logs.";
+}
+
+async function readGeminiResponse(response) {
+  const bodyText = await response.text();
+
+  try {
+    return bodyText ? JSON.parse(bodyText) : {};
+  } catch {
+    return { rawText: bodyText };
+  }
+}
+
+async function callGemini(code, systemInstruction) {
+  ensureApiKey();
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), GEMINI_TIMEOUT_MS);
+  const url = `https://generativelanguage.googleapis.com/${GEMINI_API_VERSION}/models/${MODEL_NAME}:generateContent?key=${API_KEY}`;
+
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      signal: controller.signal,
+      body: JSON.stringify({
+        systemInstruction: {
+          parts: [{ text: systemInstruction }],
+        },
+        contents: [
+          {
+            role: "user",
+            parts: [{ text: code }],
+          },
+        ],
+        generationConfig: {
+          temperature: 0.2,
+          maxOutputTokens: 4096,
+        },
+      }),
+    });
+
+    const data = await readGeminiResponse(response);
+
+    if (!response.ok) {
+      const upstreamMessage = data?.error?.message || data?.rawText || response.statusText;
+      throw createServiceError(
+        getGeminiStatusCode(response.status),
+        getGeminiErrorMessage(response.status, upstreamMessage),
+        new Error(upstreamMessage)
+      );
+    }
+
+    return parseGeminiText(data);
+  } catch (error) {
+    if (error.statusCode) {
+      throw error;
+    }
+
+    if (error.name === "AbortError") {
+      throw createServiceError(504, "Gemini request timed out. Please try again.", error);
+    }
+
+    throw createServiceError(
+      502,
+      `Could not reach Gemini API: ${error.message || "unknown error"}`,
+      error
+    );
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 async function generateWithInstruction(code, systemInstruction) {
@@ -105,23 +202,7 @@ async function generateWithInstruction(code, systemInstruction) {
     throw createServiceError(400, "Code is required.");
   }
 
-  try {
-    const model = createModel(systemInstruction);
-    const result = await model.generateContent(code);
-    const text = result.response.text();
-
-    if (!text) {
-      throw createServiceError(502, "Gemini returned an empty response.");
-    }
-
-    return text;
-  } catch (error) {
-    if (error.statusCode) {
-      throw error;
-    }
-
-    throw createServiceError(502, getGeminiErrorMessage(error), error);
-  }
+  return callGemini(code, systemInstruction);
 }
 
 async function generateReview(code) {
