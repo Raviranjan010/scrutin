@@ -1,6 +1,7 @@
 const express = require('express');
 const aiRoutes = require('./routes/ai.routes')
 const authRoutes = require('./routes/auth.routes')
+const reviewRoutes = require('./routes/review.routes')
 const cors = require('cors')
 const session = require('express-session');
 const passport = require('passport');
@@ -26,5 +27,6 @@ app.get('/', (req, res) => {
 
 app.use('/auth', authRoutes)
 app.use('/ai', aiRoutes)
+app.use('/reviews', reviewRoutes)
 
 module.exports = app

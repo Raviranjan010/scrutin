@@ -1,5 +1,6 @@
 const { streamReview } = require("../services/ai.service");
 const { updateUserUsage } = require("../services/auth.service");
+const { saveReview } = require("../services/review.service");
 
 module.exports.getReview = async (req, res) => {
   const { code, language } = req.body;
@@ -27,15 +28,36 @@ module.exports.getReview = async (req, res) => {
 
   try {
     const stream = streamReview(code, language || "javascript");
+    let fullReviewText = "";
 
     for await (const chunk of stream) {
+      fullReviewText += chunk;
       res.write(`data: ${JSON.stringify(chunk)}\n\n`);
     }
 
     if (user && !user.isPro) {
       await updateUserUsage(user.id);
     }
+    
+    // Parse score from text
+    let score = null;
+    const match = fullReviewText.match(/SCORE_JSON:(\{.*?\})/s);
+    if (match) {
+      try {
+        const scoreData = JSON.parse(match[1]);
+        score = scoreData.overall;
+      } catch (e) {}
+    }
 
+    const reviewId = await saveReview({
+      userId: user ? user.id : null,
+      code,
+      language: language || "javascript",
+      review: fullReviewText,
+      score
+    });
+
+    res.write(`data: ${JSON.stringify({ reviewId })}\n\n`);
     res.write("data: [DONE]\n\n");
     res.end();
   } catch (error) {
