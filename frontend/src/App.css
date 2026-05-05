@@ -1021,3 +1021,111 @@
   border-radius: 4px;
   transition: width 0.3s ease;
 }
+
+/* ============================================
+   EXPORT & SHARE STYLES
+   ============================================ */
+
+.glass-pill {
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink);
+  background: rgba(245, 242, 236, 0.45);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(196, 154, 60, 0.25);
+  border-radius: 50px;
+  padding: 8px 16px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+}
+
+.glass-pill:hover {
+  border-color: rgba(196, 154, 60, 0.5);
+  box-shadow: 0 4px 12px rgba(15, 14, 12, 0.05);
+  transform: translateY(-1px);
+}
+
+.export-dropdown-container {
+  position: relative;
+  display: inline-block;
+}
+
+.export-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 200px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  z-index: 200;
+  border-radius: 12px;
+}
+
+.export-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 12px;
+  font-size: 13px;
+  color: var(--ink2);
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  text-align: left;
+}
+
+.export-menu-item:hover {
+  background: rgba(196, 154, 60, 0.1);
+  color: var(--ink);
+}
+
+.toast-notification {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: rgba(245, 242, 236, 0.85);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(196, 154, 60, 0.3);
+  padding: 12px 20px;
+  border-radius: 50px;
+  box-shadow: 0 8px 24px rgba(15, 14, 12, 0.1);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink);
+  z-index: 1000;
+  animation: fadeUpToast 0.3s ease forwards, fadeOutToast 0.3s ease 2.7s forwards;
+}
+
+@keyframes fadeUpToast {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeOutToast {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(20px); }
+}
+
+.public-badge {
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--sage);
+  background: rgba(74, 107, 74, 0.1);
+  border: 1px solid rgba(74, 107, 74, 0.2);
+  border-radius: 50px;
+  padding: 4px 12px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
