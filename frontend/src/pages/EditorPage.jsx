@@ -124,8 +124,16 @@ function EditorPage() {
       toast.success(`${mode === 'security' ? 'Security scan' : 'Code review'} complete!`)
     } catch (error) {
       console.error('Error reviewing code:', error)
-      setReview('## Error\nUnable to get code review. Please check your connection and try again.')
-      toast.error('Review failed. Please try again.')
+      const serverMessage = typeof error.response?.data === 'string'
+        ? error.response.data
+        : error.message
+      const fallbackMessage = mode === 'security'
+        ? 'Unable to complete the security scan. Please try again.'
+        : 'Unable to get code review. Please try again.'
+      const message = serverMessage || fallbackMessage
+
+      setReview(`## Error\n${message}`)
+      toast.error(message)
     } finally {
       setIsLoading(false)
     }

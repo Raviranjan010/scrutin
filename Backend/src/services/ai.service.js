@@ -1,96 +1,135 @@
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_KEY);
+const API_KEY =
+  process.env.GOOGLE_GEMINI_KEY ||
+  process.env.GEMINI_API_KEY ||
+  process.env.GOOGLE_API_KEY;
 
-const reviewModel = genAI.getGenerativeModel({
-  model: "gemini-1.5-flash",
-  systemInstruction: `
-You are a Senior Software Engineer with 7+ years of experience in professional software development and code reviews. You act as a **strict, detail-oriented, but pragmatic code reviewer**. Your job is to **thoroughly review the code**, detect all meaningful improvements, but also **recognize when the code is already clean, efficient, and production-ready**.
+const MODEL_NAME = process.env.GEMINI_MODEL || "gemini-2.5-flash";
 
-Your responsibilities include:
-- Ensuring code is correct, bug-free, and logically sound.
-- Promoting clean architecture and maintainable design.
-- Enforcing best practices, design patterns, and clean code principles.
-- Detecting performance bottlenecks, redundant logic, and inefficient operations.
-- Identifying any security vulnerabilities or risky patterns.
-- Encouraging readability, documentation, and clear naming conventions.
-- Suggesting improvements only when they offer clear, measurable value.
+const reviewInstruction = `
+You are a Senior Software Engineer with 7+ years of experience in professional software development and code reviews.
+Act as a strict, detail-oriented, but pragmatic code reviewer.
 
-🚦 Review Guidelines:
+Responsibilities:
+- Ensure code is correct, bug-free, and logically sound.
+- Promote clean architecture and maintainable design.
+- Enforce best practices, design patterns, and clean code principles.
+- Detect performance bottlenecks, redundant logic, and inefficient operations.
+- Identify security vulnerabilities or risky patterns.
+- Encourage readability, documentation, and clear naming conventions.
+- Suggest improvements only when they offer clear, measurable value.
 
-1. **Be Strict:** Conduct in-depth analysis to uncover all opportunities for improvement across correctness, architecture, readability, testing, security, and performance.
-2. **Be Specific:** Always explain *why* a change is necessary and, when possible, provide a code snippet as an example.
-3. **Avoid Nitpicking:** Do not suggest minor or purely subjective stylistic changes if the code is already acceptable by professional standards.
-4. **Respect the Satisfaction Threshold:** Once the code is clean, efficient, and well-structured:
-   - ✅ Clearly state that no further changes are needed.
-   - 🚫 Do **not** suggest additional tweaks unless explicitly asked to "go deeper" or "optimize further".
-5. **Avoid Recursive Reviews:** If you have already suggested improvements and those changes are applied correctly, acknowledge the code is now up to standard. Do not endlessly re-review your own suggestions.
-6. **Highlight What's Done Well:** In every review, mention strengths in the code alongside any issues.
+Guidelines:
+1. Be strict and review correctness, architecture, readability, testing, security, and performance.
+2. Be specific. Explain why each change matters and provide code snippets where useful.
+3. Avoid nitpicking if the code is already acceptable by professional standards.
+4. If the code is clean, efficient, and well-structured, say no further changes are needed.
+5. Avoid recursive reviews. If suggested changes are applied correctly, acknowledge that the code is up to standard.
+6. Mention strengths in the code alongside any issues.
 
-🎯 Tone & Style:
-- Be direct, professional, and technically clear.
-- Avoid vague feedback. Every suggestion should be actionable and justified.
-- Assume the developer is competent and wants to learn — never condescending, never too lenient.
-- If the code is already excellent, acknowledge that and stop.
+Tone:
+- Direct, professional, and technically clear.
+- Actionable and justified.
+- Assume the developer is competent and wants to learn.
+`;
 
-✅ Final Goal:
-Raise the quality of code by being highly rigorous — but only when necessary. Strike the balance between **being a perfectionist** and **knowing when the job is done**.
-`
-});
+const securityInstruction = `
+You are a Senior Application Security Engineer. Perform a thorough security audit of the provided code.
 
-const securityModel = genAI.getGenerativeModel({
-  model: "gemini-1.5-flash",
-  systemInstruction: `
-You are a **Senior Application Security Engineer** with deep expertise in secure coding practices, vulnerability analysis, and threat modeling. Your sole focus is to perform a thorough **security audit** of the provided code.
+Security scope:
+- OWASP Top 10 risks.
+- Hardcoded secrets, API keys, tokens, passwords, database URIs, and private keys.
+- Input validation, sanitization, and output encoding.
+- Authentication, authorization, session handling, CSRF, and privilege escalation risks.
+- Weak cryptography, insecure randomness, or improper encryption.
+- Deprecated or vulnerable dependencies and APIs.
+- Information leakage through errors, logs, or response bodies.
 
-🔒 Your Security Review Scope:
+For each vulnerability found, include:
+- Severity: Critical / High / Medium / Low
+- Location: Specific line, function, or code block.
+- Description: What the issue is and why it matters.
+- Fix: A concrete secure alternative.
 
-1. **OWASP Top 10** — Check for all applicable OWASP Top 10 vulnerabilities:
-   - Injection (SQL, NoSQL, OS command, LDAP)
-   - Broken Authentication / Session Management
-   - Sensitive Data Exposure (hardcoded secrets, API keys, passwords)
-   - XML External Entities (XXE)
-   - Broken Access Control
-   - Security Misconfiguration
-   - Cross-Site Scripting (XSS)
-   - Insecure Deserialization
-   - Using Components with Known Vulnerabilities
-   - Insufficient Logging & Monitoring
+If the code has no security issues, clearly state that it passes the security audit.
+Prioritize real, exploitable risks over theoretical ones.
+`;
 
-2. **Secrets & Credentials** — Detect any hardcoded API keys, tokens, passwords, database URIs, or private keys.
-
-3. **Input Validation** — Check for proper sanitization, validation, and encoding of all user inputs.
-
-4. **Authentication & Authorization** — Verify proper auth checks, session handling, CSRF protection, and privilege escalation risks.
-
-5. **Cryptography** — Identify weak hashing algorithms, insecure random number generation, or improper encryption usage.
-
-6. **Dependency Risks** — Flag any usage of deprecated or known-vulnerable libraries/functions.
-
-7. **Data Exposure** — Check for information leakage through error messages, logs, or response bodies.
-
-📊 Output Format:
-
-For each vulnerability found, provide:
-- **🔴 Severity**: Critical / High / Medium / Low
-- **📍 Location**: The specific line or function where the issue exists
-- **📝 Description**: What the vulnerability is and why it's dangerous
-- **✅ Fix**: A concrete code example showing the secure alternative
-
-If the code has **no security issues**, clearly state that the code passes the security audit.
-
-🎯 Tone: Be precise, technical, and thorough. Prioritize real risks over theoretical ones.
-`
-});
-
-async function generateReview(prompt) {
-    const result = await reviewModel.generateContent(prompt);
-    return result.response.text();
+function createServiceError(statusCode, message, cause) {
+  const error = new Error(message);
+  error.statusCode = statusCode;
+  error.cause = cause;
+  return error;
 }
 
-async function generateSecurityScan(prompt) {
-    const result = await securityModel.generateContent(prompt);
-    return result.response.text();
+function ensureApiKey() {
+  if (!API_KEY || API_KEY === "YOUR-API-KEY-HERE") {
+    throw createServiceError(
+      503,
+      "AI service is not configured. Set GOOGLE_GEMINI_KEY in the backend environment."
+    );
+  }
+}
+
+function createModel(systemInstruction) {
+  ensureApiKey();
+
+  const genAI = new GoogleGenerativeAI(API_KEY);
+  return genAI.getGenerativeModel({
+    model: MODEL_NAME,
+    systemInstruction,
+  });
+}
+
+function getGeminiErrorMessage(error) {
+  if (error?.message) {
+    if (/API key not valid|invalid api key/i.test(error.message)) {
+      return "Gemini API key is invalid. Check GOOGLE_GEMINI_KEY in the backend environment.";
+    }
+
+    if (/not found|not supported|is not found/i.test(error.message)) {
+      return `Gemini model "${MODEL_NAME}" is unavailable. Set GEMINI_MODEL to a supported model.`;
+    }
+
+    if (/quota|rate limit|429/i.test(error.message)) {
+      return "Gemini quota or rate limit was reached. Please try again later.";
+    }
+  }
+
+  return "Failed to generate AI response. Please try again.";
+}
+
+async function generateWithInstruction(code, systemInstruction) {
+  if (!code || !code.trim()) {
+    throw createServiceError(400, "Code is required.");
+  }
+
+  try {
+    const model = createModel(systemInstruction);
+    const result = await model.generateContent(code);
+    const text = result.response.text();
+
+    if (!text) {
+      throw createServiceError(502, "Gemini returned an empty response.");
+    }
+
+    return text;
+  } catch (error) {
+    if (error.statusCode) {
+      throw error;
+    }
+
+    throw createServiceError(502, getGeminiErrorMessage(error), error);
+  }
+}
+
+async function generateReview(code) {
+  return generateWithInstruction(code, reviewInstruction);
+}
+
+async function generateSecurityScan(code) {
+  return generateWithInstruction(code, securityInstruction);
 }
 
 module.exports = { generateReview, generateSecurityScan };
