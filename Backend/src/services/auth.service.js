@@ -1,53 +1,25 @@
-const fs = require('fs');
-const path = require('path');
+const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
-const USERS_FILE = path.join(__dirname, '../../data/users.json');
-
-const getUsers = () => {
-  if (!fs.existsSync(USERS_FILE)) {
-    fs.mkdirSync(path.dirname(USERS_FILE), { recursive: true });
-    fs.writeFileSync(USERS_FILE, '[]');
-    return [];
-  }
-  const data = fs.readFileSync(USERS_FILE, 'utf8');
-  try {
-    return JSON.parse(data);
-  } catch (e) {
-    return [];
-  }
-};
-
-const saveUsers = (users) => {
-  fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
-};
-
 module.exports.signUp = async (email, password) => {
-  const users = getUsers();
-  if (users.find(u => u.email === email)) {
+  const existingUser = await User.findOne({ email });
+  if (existingUser) {
     throw new Error('User already exists');
   }
 
   const hashedPassword = await bcrypt.hash(password, 10);
-  const newUser = {
-    id: Date.now().toString(),
+  const newUser = await User.create({
     email,
     password: hashedPassword,
-    isPro: false,
-    usage: {},
     provider: 'local'
-  };
+  });
 
-  users.push(newUser);
-  saveUsers(users);
-
-  return { id: newUser.id, email: newUser.email, isPro: newUser.isPro };
+  return { id: newUser._id, email: newUser.email, isPro: newUser.isPro };
 };
 
 module.exports.signIn = async (email, password) => {
-  const users = getUsers();
-  const user = users.find(u => u.email === email);
+  const user = await User.findOne({ email });
 
   if (!user || user.provider !== 'local') {
     throw new Error('Invalid email or password');
@@ -58,16 +30,23 @@ module.exports.signIn = async (email, password) => {
     throw new Error('Invalid email or password');
   }
 
-  const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET || 'secret', { expiresIn: '7d' });
+  const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET || 'secret', { expiresIn: '7d' });
   
-  return { token, user: { id: user.id, email: user.email, isPro: user.isPro, usage: user.usage } };
+  return { 
+    token, 
+    user: { 
+      id: user._id, 
+      email: user.email, 
+      isPro: user.isPro, 
+      usage: Object.fromEntries(user.usage || new Map()) 
+    } 
+  };
 };
 
-module.exports.verifyToken = (token) => {
+module.exports.verifyToken = async (token) => {
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret');
-    const users = getUsers();
-    const user = users.find(u => u.id === decoded.id);
+    const user = await User.findById(decoded.id);
     if (!user) throw new Error('User not found');
     return user;
   } catch (e) {
@@ -75,52 +54,51 @@ module.exports.verifyToken = (token) => {
   }
 };
 
-module.exports.githubCallback = (profile) => {
-  const users = getUsers();
-  let user = users.find(u => u.githubId === profile.id);
+module.exports.githubCallback = async (profile) => {
+  let user = await User.findOne({ githubId: profile.id });
 
   if (!user) {
-    // Also check if email exists from github
     const email = profile.emails && profile.emails[0] ? profile.emails[0].value : null;
     if (email) {
-      user = users.find(u => u.email === email);
+      user = await User.findOne({ email });
     }
 
     if (!user) {
-      user = {
-        id: Date.now().toString(),
+      user = await User.create({
         githubId: profile.id,
         email: email,
         username: profile.username || profile.displayName,
-        isPro: false,
-        usage: {},
         provider: 'github'
-      };
-      users.push(user);
-      saveUsers(users);
+      });
     } else {
       user.githubId = profile.id;
-      saveUsers(users);
+      await user.save();
     }
   }
 
-  const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET || 'secret', { expiresIn: '7d' });
-  return { token, user: { id: user.id, email: user.email, isPro: user.isPro, usage: user.usage } };
+  const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET || 'secret', { expiresIn: '7d' });
+  return { 
+    token, 
+    user: { 
+      id: user._id, 
+      email: user.email, 
+      isPro: user.isPro, 
+      usage: Object.fromEntries(user.usage || new Map()) 
+    } 
+  };
 };
 
 module.exports.updateUserUsage = async (userId) => {
-  const users = getUsers();
-  const user = users.find(u => u.id === userId);
+  const user = await User.findById(userId);
   if (user) {
     const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
-    if (!user.usage) user.usage = {};
-    if (!user.usage[currentMonth]) user.usage[currentMonth] = 0;
-    user.usage[currentMonth] += 1;
-    saveUsers(users);
+    const currentUsage = user.usage.get(currentMonth) || 0;
+    user.usage.set(currentMonth, currentUsage + 1);
+    await user.save();
   }
 };
 
-module.exports.getUserById = (userId) => {
-  const users = getUsers();
-  return users.find(u => u.id === userId);
+module.exports.getUserById = async (userId) => {
+  return await User.findById(userId);
 };
+
