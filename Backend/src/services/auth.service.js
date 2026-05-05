@@ -2,8 +2,19 @@ const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
+function getJwtSecret() {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('JWT_SECRET must be set in production.');
+    }
+    return 'dev_jwt_secret';
+  }
+  return secret;
+}
+
 function createToken(user) {
-  return jwt.sign({ id: user._id }, process.env.JWT_SECRET || 'secret', { expiresIn: '7d' });
+  return jwt.sign({ id: user._id }, getJwtSecret(), { expiresIn: '7d' });
 }
 
 function serializeUser(user) {
@@ -65,7 +76,7 @@ module.exports.signIn = async (email, password) => {
 
 module.exports.verifyToken = async (token) => {
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret');
+    const decoded = jwt.verify(token, getJwtSecret());
     const user = await User.findById(decoded.id);
     if (!user) throw new Error('User not found');
     return serializeUser(user);

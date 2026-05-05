@@ -5,6 +5,9 @@ import { python } from '@codemirror/lang-python'
 import { go } from '@codemirror/lang-go'
 import { rust } from '@codemirror/lang-rust'
 import { java } from '@codemirror/lang-java'
+import { cpp } from '@codemirror/lang-cpp'
+import { php } from '@codemirror/lang-php'
+import { sql } from '@codemirror/lang-sql'
 import { oneDark } from '@codemirror/theme-one-dark'
 import { Decoration } from '@codemirror/view'
 import { StateField, StateEffect } from '@codemirror/state'
@@ -22,18 +25,18 @@ import ShareButton from '../components/ShareButton'
 import ExportDropdown from '../components/ExportDropdown'
 
 const LANGUAGES = {
-  javascript:  { label: 'JavaScript',  ext: () => javascript() },
-  typescript:  { label: 'TypeScript',  ext: () => javascript({ typescript: true }) },
-  python:      { label: 'Python',      ext: () => python() },
-  go:          { label: 'Go',          ext: () => go() },
-  rust:        { label: 'Rust',        ext: () => rust() },
-  java:        { label: 'Java',        ext: () => java() },
-  php:         { label: 'PHP',         ext: () => javascript() },
-  ruby:        { label: 'Ruby',        ext: () => javascript() },
-  cpp:         { label: 'C++',         ext: () => javascript() },
-  swift:       { label: 'Swift',       ext: () => javascript() },
-  kotlin:      { label: 'Kotlin',      ext: () => java() },
-  sql:         { label: 'SQL',         ext: () => javascript() },
+  javascript:  { label: 'JavaScript',  ext: () => javascript(), default: `function sum() {\n  return 1 + 1\n}` },
+  typescript:  { label: 'TypeScript',  ext: () => javascript({ typescript: true }), default: `function sum(a: number, b: number): number {\n  return a + b\n}` },
+  python:      { label: 'Python',      ext: () => python(), default: `def sum(a, b):\n    return a + b` },
+  go:          { label: 'Go',          ext: () => go(), default: `package main\n\nfunc sum(a int, b int) int {\n\treturn a + b\n}` },
+  rust:        { label: 'Rust',        ext: () => rust(), default: `fn sum(a: i32, b: i32) -> i32 {\n    a + b\n}` },
+  java:        { label: 'Java',        ext: () => java(), default: `public class Main {\n    public static int sum(int a, int b) {\n        return a + b;\n    }\n}` },
+  php:         { label: 'PHP',         ext: () => php(), default: `<?php\nfunction sum($a, $b) {\n    return $a + $b;\n}` },
+  ruby:        { label: 'Ruby',        ext: () => rust(), default: `def sum(a, b)\n  a + b\nend` }, // Fallback to rust for ruby highlighting if no better
+  cpp:         { label: 'C++',         ext: () => cpp(), default: `#include <iostream>\n\nint sum(int a, int b) {\n    return a + b;\n}` },
+  swift:       { label: 'Swift',       ext: () => rust(), default: `func sum(a: Int, b: Int) -> Int {\n    return a + b\n}` }, // Fallback to rust
+  kotlin:      { label: 'Kotlin',      ext: () => java(), default: `fun sum(a: Int, b: Int): Int {\n    return a + b\n}` },
+  sql:         { label: 'SQL',         ext: () => sql(), default: `SELECT 1 + 1 AS sum;` },
 }
 
 // ---- Line Highlight Logic ----
@@ -276,6 +279,19 @@ export default function MainEditor() {
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [code, language, sidebarOpen, isLoading])
+
+  // Handle language change and default snippet
+  const prevLanguageRef = useRef(language)
+  useEffect(() => {
+    if (prevLanguageRef.current !== language) {
+      const prevLang = prevLanguageRef.current
+      // Only swap if current code is the default of the previous language
+      if (code.trim() === LANGUAGES[prevLang].default.trim()) {
+        setCode(LANGUAGES[language].default)
+      }
+      prevLanguageRef.current = language
+    }
+  }, [language, code])
 
   // Custom Markdown Components for Line Navigation
   const MarkdownComponents = {

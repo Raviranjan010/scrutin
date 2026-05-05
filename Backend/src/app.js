@@ -11,6 +11,45 @@ const rateLimit = require('express-rate-limit');
 
 const app = express()
 app.set('trust proxy', 1)
+ 
+ // Validation for required production environment variables
+ function validateEnv() {
+   const isProd = process.env.NODE_ENV === 'production';
+   const required = [
+     'GOOGLE_GEMINI_KEY',
+     'JWT_SECRET',
+     'SESSION_SECRET'
+   ];
+ 
+   if (isProd) {
+     required.push('MONGODB_URI', 'FRONTEND_URL', 'BACKEND_URL');
+   }
+ 
+   const missing = required.filter(key => !process.env[key]);
+ 
+   if (missing.length > 0) {
+     console.error('FATAL: Missing required environment variables:');
+     missing.forEach(key => console.error(` - ${key}`));
+     if (isProd) {
+       process.exit(1);
+     } else {
+       console.warn('Backend will run with limited functionality.');
+     }
+   }
+ }
+ 
+ validateEnv();
+
+function getSessionSecret() {
+  const secret = process.env.SESSION_SECRET;
+  if (!secret) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('SESSION_SECRET must be set in production.');
+    }
+    return 'dev_session_secret';
+  }
+  return secret;
+}
 
 app.use(cors({
   origin: (origin, callback) => {
@@ -34,7 +73,7 @@ app.use(compression())
 app.use(express.json())
 
 app.use(session({ 
-  secret: process.env.SESSION_SECRET || 'secret', 
+  secret: getSessionSecret(), 
   resave: false, 
   saveUninitialized: false,
   cookie: {

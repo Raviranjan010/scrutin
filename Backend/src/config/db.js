@@ -21,15 +21,26 @@ async function tryConnect(uri) {
 
 const connectDB = async () => {
   const mongoUri = process.env.MONGODB_URI;
-  const allowLocalFallback = process.env.NODE_ENV !== 'production';
+  const isProduction = process.env.NODE_ENV === 'production';
+
+  if (isProduction && !mongoUri) {
+    console.error('FATAL ERROR: MONGODB_URI is not set in production environment.');
+    console.error('Please provide a valid MongoDB Atlas URI in your environment variables.');
+    process.exit(1);
+  }
 
   try {
     if (mongoUri) {
       return await tryConnect(mongoUri);
     }
+    
+    // In production, we should never reach here because of the check above.
+    // In development/test, we fallback to local.
     console.warn(`MONGODB_URI is not set. Trying local MongoDB: ${DEFAULT_MONGO_URI}`);
     return await tryConnect(DEFAULT_MONGO_URI);
   } catch (error) {
+    const allowLocalFallback = !isProduction;
+
     if (mongoUri && allowLocalFallback && isAuthFailure(error)) {
       try {
         console.warn('MongoDB auth failed for MONGODB_URI. Falling back to local MongoDB for development.');
@@ -47,9 +58,12 @@ const connectDB = async () => {
     console.error(`Reason: ${error.message}`);
     if (!mongoUri) {
       console.error(`Tried default local URI: ${DEFAULT_MONGO_URI}`);
-      console.error('Set MONGODB_URI in Backend/.env if your database is hosted remotely.');
     } else {
-      console.error('Check your MONGODB_URI in Backend/.env (credentials, host, and network access).');
+      console.error('\n--- Troubleshooting MongoDB Connection ---');
+      console.error('1. Check if your IP address is whitelisted in MongoDB Atlas.');
+      console.error('2. Verify the username and password in MONGODB_URI.');
+      console.error('3. Ensure the cluster is running and accessible.');
+      console.error('-------------------------------------------\n');
     }
     process.exit(1);
   }
