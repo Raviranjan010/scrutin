@@ -67,6 +67,9 @@ export default function MainEditor() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [currentScore, setCurrentScore] = useState(null)
   const [currentReviewId, setCurrentReviewId] = useState(null)
+  const [scanMode, setScanMode] = useState('review')
+  const [secretWarning, setSecretWarning] = useState(null)
+  const [securityData, setSecurityData] = useState(null)
   
   const reviewBodyRef = useRef(null)
   const editorRef = useRef(null)
@@ -81,23 +84,46 @@ export default function MainEditor() {
     }
   }, [])
 
+  // Check for secrets
+  const checkSecrets = useCallback((newCode) => {
+    const lines = newCode.split('\n')
+    const secretRegex = /(AKIA[0-9A-Z]{16})|(sk-[a-zA-Z0-9]{48})|(-----BEGIN (RSA |OPENSSH )?PRIVATE KEY-----)|(password\s*=\s*['"][^'"]+['"])/i
+    for (let i = 0; i < lines.length; i++) {
+      if (secretRegex.test(lines[i])) {
+        setSecretWarning(`Potential secret detected on line ${i + 1}. Remove before sharing.`)
+        return
+      }
+    }
+    setSecretWarning(null)
+  }, [])
+
+  const handleCodeChange = useCallback((value) => {
+    setCode(value)
+    checkSecrets(value)
+  }, [checkSecrets])
+
   // Parse score from review text
   const parseScore = (text) => {
-    const match = text.match(/SCORE_JSON:(\{.*?\})/s)
+    let match = text.match(/SCORE_JSON:(\{.*?\})/s)
     if (match) {
       try {
         const scoreData = JSON.parse(match[1])
-        return scoreData
-      } catch (e) {
-        return null
-      }
+        return { type: 'review', data: scoreData }
+      } catch (e) {}
+    }
+    match = text.match(/SECURITY_SCORE_JSON:(\{.*?\})/s)
+    if (match) {
+      try {
+        const scoreData = JSON.parse(match[1])
+        return { type: 'security', data: scoreData }
+      } catch (e) {}
     }
     return null
   }
 
   // Strip SCORE_JSON from displayed text
   const displayReview = useMemo(() => {
-    return review.replace(/SCORE_JSON:\{.*?\}/s, '').trim()
+    return review.replace(/SCORE_JSON:\{.*?\}/s, '').replace(/SECURITY_SCORE_JSON:\{.*?\}/s, '').trim()
   }, [review])
 
   const jumpToLine = useCallback((lineNum) => {
@@ -129,12 +155,14 @@ export default function MainEditor() {
     setReview('')
     setCurrentScore(null)
     setCurrentReviewId(null)
+    setSecurityData(null)
 
     let fullText = ''
     let parsedReviewId = null
 
     try {
-      const response = await fetch('http://localhost:3000/ai/get-review', {
+      const endpoint = scanMode === 'security' ? 'http://localhost:3000/ai/security-scan' : 'http://localhost:3000/ai/get-review'
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -191,24 +219,37 @@ export default function MainEditor() {
   function finishReview(text, reviewId) {
     setIsStreaming(false)
     setIsLoading(false)
-    const scoreData = parseScore(text)
-    if (scoreData) {
-      setCurrentScore(scoreData.overall)
+    const scoreResult = parseScore(text)
+    if (scoreResult) {
+      if (scoreResult.type === 'review') {
+        setCurrentScore(scoreResult.data.overall)
+      } else if (scoreResult.type === 'security') {
+        setCurrentScore(scoreResult.data.score)
+        setSecurityData(scoreResult.data)
+      }
       saveReview({
         language: LANGUAGES[language].label,
         code,
         review: text,
-        score: scoreData.overall
+        score: scoreResult.data.overall || scoreResult.data.score
       })
     }
   }
 
   const handleRestore = (entry) => {
-    setCode(entry.codeSnippet.length >= 120 ? "/* Snippet restored. Full code was longer than 120 chars in history preview */\n" + entry.codeSnippet : entry.codeSnippet)
+    const newCode = entry.codeSnippet.length >= 120 ? "/* Snippet restored. Full code was longer than 120 chars in history preview */\n" + entry.codeSnippet : entry.codeSnippet
+    setCode(newCode)
+    checkSecrets(newCode)
     setReview(entry.review)
     setCurrentScore(entry.score)
     setSidebarOpen(false)
     setCurrentReviewId(null)
+    const parsed = parseScore(entry.review)
+    if (parsed && parsed.type === 'security') {
+      setSecurityData(parsed.data)
+    } else {
+      setSecurityData(null)
+    }
   }
 
   // Keyboard Shortcuts
@@ -301,7 +342,20 @@ export default function MainEditor() {
               <span className="toolbar-dot"></span>
               <span className="toolbar-dot"></span>
               <span className="toolbar-dot"></span>
-              <span className="toolbar-label">editor</span>
+              <div className="mode-toggle" style={{ marginLeft: '16px' }}>
+                <button 
+                  className={`mode-pill ${scanMode === 'review' ? 'active' : 'inactive'}`}
+                  onClick={() => setScanMode('review')}
+                >
+                  Review
+                </button>
+                <button 
+                  className={`mode-pill ${scanMode === 'security' ? 'active' : 'inactive'}`}
+                  onClick={() => setScanMode('security')}
+                >
+                  Security Scan
+                </button>
+              </div>
             </div>
             <select
               id="language-selector"
@@ -315,6 +369,12 @@ export default function MainEditor() {
             </select>
           </div>
 
+          {secretWarning && (
+            <div className="secret-banner">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+              {secretWarning}
+            </div>
+          )}
           <div className="editor-area">
             <CodeMirror
               ref={editorRef}
@@ -322,7 +382,7 @@ export default function MainEditor() {
               height="100%"
               extensions={[langExtension, highlightField]}
               theme={oneDark}
-              onChange={(value) => setCode(value)}
+              onChange={handleCodeChange}
               basicSetup={{
                 lineNumbers: true,
                 highlightActiveLine: true,
@@ -345,9 +405,9 @@ export default function MainEditor() {
                 className={`review-btn ${isLoading ? 'loading' : ''}`}
                 onClick={reviewCode}
                 disabled={isLoading}
-                style={{ position: 'static' }}
+                style={{ position: 'static', backgroundColor: scanMode === 'security' ? 'var(--rust)' : 'var(--ink)' }}
               >
-                {isLoading ? 'Reviewing\u2026' : 'Review'}
+                {isLoading ? (scanMode === 'security' ? 'Scanning\u2026' : 'Reviewing\u2026') : (scanMode === 'security' ? 'Scan for vulnerabilities' : 'Review')}
               </button>
             </div>
             
@@ -375,7 +435,7 @@ export default function MainEditor() {
         <section className="review-panel glass-card fade-up" style={{ '--delay': '0.2s' }}>
           <div className="review-panel-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <span className="review-panel-title">Review</span>
+              <span className="review-panel-title">{scanMode === 'security' ? 'Security Scan' : 'Review'}</span>
               {isStreaming && <span className="streaming-badge">streaming</span>}
             </div>
             {currentReviewId && !isStreaming && (
@@ -391,7 +451,21 @@ export default function MainEditor() {
               </div>
             ) : (
               <div className={`review-content ${isStreaming ? 'is-streaming' : ''}`}>
-                {currentScore !== null && <ScoreRing score={currentScore} />}
+                {securityData ? (
+                  <div className="security-dashboard">
+                    <div className="security-score-col">
+                      <ScoreRing score={currentScore} />
+                    </div>
+                    <div className="security-badges">
+                      <div className="severity-badge critical">Critical <span className="count">{securityData.critical || 0}</span></div>
+                      <div className="severity-badge high">High <span className="count">{securityData.high || 0}</span></div>
+                      <div className="severity-badge medium">Medium <span className="count">{securityData.medium || 0}</span></div>
+                      <div className="severity-badge low">Low <span className="count">{securityData.low || 0}</span></div>
+                    </div>
+                  </div>
+                ) : (
+                  currentScore !== null && <ScoreRing score={currentScore} />
+                )}
                 <Markdown components={MarkdownComponents} rehypePlugins={[rehypeHighlight]}>
                   {displayReview}
                 </Markdown>

@@ -60,4 +60,36 @@ async function* streamReview(code, language) {
   }
 }
 
-module.exports = { streamReview };
+const securityModel = genAI.getGenerativeModel({
+  model: "gemini-2.5-flash-lite",
+  systemInstruction: `You are a security-focused code auditor specializing in the OWASP Top 10.
+Analyze the provided code for security vulnerabilities. For each issue found:
+1. Name the OWASP category (e.g., A01:2021 Broken Access Control)
+2. Severity: CRITICAL / HIGH / MEDIUM / LOW
+3. Line reference if visible
+4. Exact description of the vulnerability
+5. Concrete fix with code example
+Format: use ## for each issue, bold the OWASP category.
+End with SECURITY_SCORE_JSON:{"score":72,"critical":1,"high":2,"medium":3,"low":1}
+If no issues found, say the code passes basic OWASP checks and score 95+`
+});
+
+/**
+ * Stream a security scan from Gemini.
+ * Yields text chunks as they arrive.
+ * @param {string} code - The code to review
+ * @param {string} language - The programming language
+ */
+async function* streamSecurityScan(code, language) {
+  const prompt = `Language: ${language}\n\nCode to review:\n${code}`;
+  const result = await securityModel.generateContentStream(prompt);
+
+  for await (const chunk of result.stream) {
+    const text = chunk.text();
+    if (text) {
+      yield text;
+    }
+  }
+}
+
+module.exports = { streamReview, streamSecurityScan };
