@@ -13,8 +13,10 @@ import rehypeHighlight from 'rehype-highlight'
 import 'highlight.js/styles/github-dark.css'
 
 import { useReviewHistory } from './hooks/useReviewHistory'
+import { useAuth } from './hooks/useAuth'
 import HistorySidebar from './components/HistorySidebar'
 import ScoreRing from './components/ScoreRing'
+import AuthPage from './pages/AuthPage'
 import './App.css'
 
 const LANGUAGES = {
@@ -66,6 +68,7 @@ function App() {
   const reviewBodyRef = useRef(null)
   const editorRef = useRef(null)
   const { history, saveReview, clearHistory, deleteReview } = useReviewHistory()
+  const { user, token, signOut, isAuthenticated, loading } = useAuth()
 
   const langExtension = useMemo(() => LANGUAGES[language].ext(), [language])
 
@@ -128,7 +131,10 @@ function App() {
     try {
       const response = await fetch('http://localhost:3000/ai/get-review', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}` 
+        },
         body: JSON.stringify({ code, language: LANGUAGES[language].label }),
       })
 
@@ -250,6 +256,14 @@ function App() {
     }
   }
 
+  if (loading) {
+    return <div className="scrutin-app"><div className="loading-spinner"></div></div>
+  }
+
+  if (!isAuthenticated) {
+    return <AuthPage />
+  }
+
   return (
     <div className="scrutin-app">
       <HistorySidebar 
@@ -276,7 +290,7 @@ function App() {
             </svg>
           </button>
         </div>
-        <button className="nav-cta">Get started</button>
+        <button className="nav-cta" onClick={signOut}>Sign out</button>
       </nav>
 
       {/* ---- Main panels ---- */}
@@ -332,6 +346,23 @@ function App() {
             >
               {isLoading ? 'Reviewing\u2026' : 'Review'}
             </button>
+            
+            {user && !user.isPro && (
+              <div className="usage-meter">
+                <div className="usage-text">
+                  {user.usage?.[new Date().toISOString().slice(0, 7)] || 0} / 50 reviews used
+                </div>
+                <div className="usage-bar-bg">
+                  <div 
+                    className="usage-bar-fill" 
+                    style={{ 
+                      width: `${Math.min(100, ((user.usage?.[new Date().toISOString().slice(0, 7)] || 0) / 50) * 100)}%` 
+                    }}
+                  ></div>
+                </div>
+              </div>
+            )}
+            
             <span className="keyboard-hint">⌘ Enter to review</span>
           </div>
         </section>
