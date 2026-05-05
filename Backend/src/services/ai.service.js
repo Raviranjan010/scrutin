@@ -1,35 +1,10 @@
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 
-function getGenAI() {
-  if (!process.env.GOOGLE_GEMINI_KEY) {
-    throw new Error("GOOGLE_GEMINI_KEY is not configured on the backend.");
-  }
-  return new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_KEY);
-}
+const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_KEY);
 
-function normalizeAIError(error) {
-  const message = error?.message || "";
-
-  if (/not found for API version|is not found for API version/i.test(message)) {
-    return new Error(
-      "Configured Gemini model is unavailable. Set GEMINI_MODEL to a supported model (for example: gemini-2.0-flash)."
-    );
-  }
-
-  if (/api key|permission denied|unauthenticated|403/i.test(message)) {
-    return new Error(
-      "Gemini API authentication failed. Verify GOOGLE_GEMINI_KEY and model access permissions."
-    );
-  }
-
-  return new Error(`AI provider error: ${message || "Unknown failure from Gemini API."}`);
-}
-
-function getReviewModel() {
-  const modelName = process.env.GEMINI_MODEL || "gemini-2.0-flash";
-  return getGenAI().getGenerativeModel({
-    model: modelName,
-    systemInstruction: `
+const reviewModel = genAI.getGenerativeModel({
+  model: "gemini-1.5-flash",
+  systemInstruction: `
 You are a Senior Software Engineer with 7+ years of experience in professional software development and code reviews. You act as a **strict, detail-oriented, but pragmatic code reviewer**. Your job is to **thoroughly review the code**, detect all meaningful improvements, but also **recognize when the code is already clean, efficient, and production-ready**.
 
 Your responsibilities include:
@@ -60,75 +35,62 @@ Your responsibilities include:
 
 ✅ Final Goal:
 Raise the quality of code by being highly rigorous — but only when necessary. Strike the balance between **being a perfectionist** and **knowing when the job is done**.
-
-CRITICAL: Always end your response with EXACTLY this JSON block on a new line:
-SCORE_JSON:{"overall":85,"bugs":2,"performance":3,"security":1,"style":4}
-(Replace the numbers with your actual assessment: overall 0-100, others are count of issues found)
 `
-  }, { apiVersion: "v1" });
+});
+
+const securityModel = genAI.getGenerativeModel({
+  model: "gemini-1.5-flash",
+  systemInstruction: `
+You are a **Senior Application Security Engineer** with deep expertise in secure coding practices, vulnerability analysis, and threat modeling. Your sole focus is to perform a thorough **security audit** of the provided code.
+
+🔒 Your Security Review Scope:
+
+1. **OWASP Top 10** — Check for all applicable OWASP Top 10 vulnerabilities:
+   - Injection (SQL, NoSQL, OS command, LDAP)
+   - Broken Authentication / Session Management
+   - Sensitive Data Exposure (hardcoded secrets, API keys, passwords)
+   - XML External Entities (XXE)
+   - Broken Access Control
+   - Security Misconfiguration
+   - Cross-Site Scripting (XSS)
+   - Insecure Deserialization
+   - Using Components with Known Vulnerabilities
+   - Insufficient Logging & Monitoring
+
+2. **Secrets & Credentials** — Detect any hardcoded API keys, tokens, passwords, database URIs, or private keys.
+
+3. **Input Validation** — Check for proper sanitization, validation, and encoding of all user inputs.
+
+4. **Authentication & Authorization** — Verify proper auth checks, session handling, CSRF protection, and privilege escalation risks.
+
+5. **Cryptography** — Identify weak hashing algorithms, insecure random number generation, or improper encryption usage.
+
+6. **Dependency Risks** — Flag any usage of deprecated or known-vulnerable libraries/functions.
+
+7. **Data Exposure** — Check for information leakage through error messages, logs, or response bodies.
+
+📊 Output Format:
+
+For each vulnerability found, provide:
+- **🔴 Severity**: Critical / High / Medium / Low
+- **📍 Location**: The specific line or function where the issue exists
+- **📝 Description**: What the vulnerability is and why it's dangerous
+- **✅ Fix**: A concrete code example showing the secure alternative
+
+If the code has **no security issues**, clearly state that the code passes the security audit.
+
+🎯 Tone: Be precise, technical, and thorough. Prioritize real risks over theoretical ones.
+`
+});
+
+async function generateReview(prompt) {
+    const result = await reviewModel.generateContent(prompt);
+    return result.response.text();
 }
 
-/**
- * Stream a code review from Gemini.
- * Yields text chunks as they arrive.
- * @param {string} code - The code to review
- * @param {string} language - The programming language
- */
-async function* streamReview(code, language) {
-  try {
-    const model = getReviewModel();
-    const prompt = `Language: ${language}\n\nCode to review:\n${code}`;
-    const result = await model.generateContentStream(prompt);
-
-    for await (const chunk of result.stream) {
-      const text = chunk.text();
-      if (text) {
-        yield text;
-      }
-    }
-  } catch (error) {
-    throw normalizeAIError(error);
-  }
+async function generateSecurityScan(prompt) {
+    const result = await securityModel.generateContent(prompt);
+    return result.response.text();
 }
 
-function getSecurityModel() {
-  const modelName = process.env.GEMINI_MODEL || "gemini-2.0-flash";
-  return getGenAI().getGenerativeModel({
-    model: modelName,
-    systemInstruction: `You are a security-focused code auditor specializing in the OWASP Top 10.
-Analyze the provided code for security vulnerabilities. For each issue found:
-1. Name the OWASP category (e.g., A01:2021 Broken Access Control)
-2. Severity: CRITICAL / HIGH / MEDIUM / LOW
-3. Line reference if visible
-4. Exact description of the vulnerability
-5. Concrete fix with code example
-Format: use ## for each issue, bold the OWASP category.
-End with SECURITY_SCORE_JSON:{"score":72,"critical":1,"high":2,"medium":3,"low":1}
-If no issues found, say the code passes basic OWASP checks and score 95+`
-  }, { apiVersion: "v1" });
-}
-
-/**
- * Stream a security scan from Gemini.
- * Yields text chunks as they arrive.
- * @param {string} code - The code to review
- * @param {string} language - The programming language
- */
-async function* streamSecurityScan(code, language) {
-  try {
-    const securityModel = getSecurityModel();
-    const prompt = `Language: ${language}\n\nCode to review:\n${code}`;
-    const result = await securityModel.generateContentStream(prompt);
-
-    for await (const chunk of result.stream) {
-      const text = chunk.text();
-      if (text) {
-        yield text;
-      }
-    }
-  } catch (error) {
-    throw normalizeAIError(error);
-  }
-}
-
-module.exports = { streamReview, streamSecurityScan };
+module.exports = { generateReview, generateSecurityScan };

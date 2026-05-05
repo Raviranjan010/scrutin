@@ -1,24 +1,19 @@
-import { Routes, Route, Navigate } from 'react-router-dom'
-import MainEditor from './pages/MainEditor'
-import ReviewPage from './pages/ReviewPage'
-import AuthPage from './pages/AuthPage'
-import { useAuth } from './hooks/useAuth'
+import { Routes, Route } from 'react-router-dom'
+import Navbar from './components/Navbar'
+import LandingPage from './pages/LandingPage'
+import EditorPage from './pages/EditorPage'
 import './App.css'
 
 function App() {
-  const { isAuthenticated, loading } = useAuth();
-  
-  if (loading) {
-    return <div className="scrutin-app"><div className="loading-spinner"></div></div>
-  }
-
   return (
-    <Routes>
-      <Route path="/" element={isAuthenticated ? <MainEditor /> : <Navigate to="/auth" />} />
-      <Route path="/auth" element={!isAuthenticated ? <AuthPage /> : <Navigate to="/" />} />
-      <Route path="/review/:id" element={<ReviewPage />} />
-    </Routes>
+    <div className="app">
+      <Navbar />
+      <Routes>
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/editor" element={<EditorPage />} />
+      </Routes>
+    </div>
   )
 }
 
-export default App;
+export default App

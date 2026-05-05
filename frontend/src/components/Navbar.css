@@ -1,0 +1,183 @@
+.navbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: var(--z-navbar);
+  padding: var(--space-4) 0;
+  transition: all var(--transition-base);
+  background: transparent;
+}
+
+.navbar--scrolled {
+  background: rgba(246, 241, 232, 0.82);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-bottom: 1px solid var(--color-border);
+  padding: var(--space-3) 0;
+  box-shadow: 0 14px 34px rgba(59, 53, 43, 0.09);
+}
+
+.navbar__container {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 var(--space-6);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* Brand */
+.navbar__brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  text-decoration: none;
+  color: var(--color-text-primary);
+}
+
+.navbar__logo {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-lg);
+  background: rgba(255, 252, 245, 0.72);
+  border: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-ink);
+  box-shadow: inset 1px 1px 0 rgba(255, 255, 255, 0.9), 0 10px 22px rgba(59, 53, 43, 0.08);
+  transition: transform var(--transition-spring);
+}
+
+.navbar__brand:hover .navbar__logo {
+  transform: rotate(-10deg) scale(1.05);
+}
+
+.navbar__brand-text {
+  font-size: var(--text-xl);
+  font-weight: 800;
+  letter-spacing: 0;
+  color: var(--color-ink);
+}
+
+/* Links */
+.navbar__links {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.navbar__link {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-lg);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  text-decoration: none;
+  transition: all var(--transition-fast);
+  position: relative;
+}
+
+.navbar__link:hover {
+  color: var(--color-text-primary);
+  background: rgba(255, 252, 245, 0.62);
+}
+
+.navbar__link--active {
+  color: var(--color-accent-dark);
+  background: rgba(119, 143, 106, 0.12);
+}
+
+.navbar__link--active::after {
+  content: '';
+  position: absolute;
+  bottom: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 16px;
+  height: 2px;
+  border-radius: var(--radius-full);
+  background: var(--color-moss);
+}
+
+/* CTA */
+.navbar__cta {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-2) var(--space-5);
+  margin-left: var(--space-3);
+  border-radius: var(--radius-full);
+  background: var(--color-ink);
+  color: var(--color-cream);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  text-decoration: none;
+  transition: all var(--transition-base);
+  box-shadow: 0 10px 22px rgba(59, 53, 43, 0.16);
+}
+
+.navbar__cta:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 28px rgba(59, 53, 43, 0.2);
+  color: var(--color-cream);
+}
+
+/* Mobile Toggle */
+.navbar__toggle {
+  display: none;
+  background: none;
+  border: none;
+  color: var(--color-text-primary);
+  cursor: pointer;
+  padding: var(--space-2);
+  border-radius: var(--radius-md);
+  transition: background var(--transition-fast);
+}
+
+.navbar__toggle:hover {
+  background: rgba(119, 143, 106, 0.12);
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+  .navbar__toggle {
+    display: flex;
+  }
+
+  .navbar__links {
+    position: fixed;
+    top: 0;
+    right: -100%;
+    width: 280px;
+    height: 100vh;
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-2);
+    padding: var(--space-20) var(--space-6) var(--space-6);
+    background: rgba(246, 241, 232, 0.96);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-left: 1px solid var(--color-border);
+    transition: right var(--transition-slow);
+    z-index: var(--z-navbar);
+  }
+
+  .navbar__links--open {
+    right: 0;
+  }
+
+  .navbar__cta {
+    margin-left: 0;
+    margin-top: var(--space-4);
+    justify-content: center;
+  }
+
+  .navbar__link {
+    padding: var(--space-3) var(--space-4);
+    font-size: var(--text-base);
+  }
+}

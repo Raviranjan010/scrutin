@@ -11,10 +11,6 @@ node_modules
 dist
 dist-ssr
 *.local
-*.env
-# .env should not be commited
-# .env.local should not be commited\
-
 
 # Editor directories and files
 .vscode/*
