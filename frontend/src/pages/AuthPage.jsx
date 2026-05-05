@@ -23,7 +23,7 @@ export default function AuthPage() {
   };
 
   const handleGithubOAuth = () => {
-    window.location.href = 'http://localhost:3000/auth/github';
+    window.location.href = `${import.meta.env.VITE_API_URL}/auth/github`;
   };
 
   return (

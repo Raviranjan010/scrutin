@@ -12,7 +12,7 @@ export function useAuth() {
       return;
     }
     try {
-      const res = await fetch('http://localhost:3000/auth/me', {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/auth/me`, {
         headers: { Authorization: `Bearer ${currentToken}` }
       });
       if (res.ok) {
@@ -46,7 +46,7 @@ export function useAuth() {
   }, [token, fetchUser]);
 
   const signIn = async (email, password) => {
-    const res = await fetch('http://localhost:3000/auth/signin', {
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/auth/signin`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password })
@@ -60,7 +60,7 @@ export function useAuth() {
   };
 
   const signUp = async (email, password) => {
-    const res = await fetch('http://localhost:3000/auth/signup', {
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/auth/signup`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password })

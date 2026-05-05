@@ -161,7 +161,7 @@ export default function MainEditor() {
     let parsedReviewId = null
 
     try {
-      const endpoint = scanMode === 'security' ? 'http://localhost:3000/ai/security-scan' : 'http://localhost:3000/ai/get-review'
+      const endpoint = scanMode === 'security' ? `${import.meta.env.VITE_API_URL}/ai/security-scan` : `${import.meta.env.VITE_API_URL}/ai/get-review`
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 

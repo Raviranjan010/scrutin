@@ -17,7 +17,7 @@ export default function ReviewPage() {
   useEffect(() => {
     async function fetchReview() {
       try {
-        const res = await fetch(`http://localhost:3000/reviews/${id}`);
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/reviews/${id}`);
         if (!res.ok) {
           throw new Error('Review not found');
         }
