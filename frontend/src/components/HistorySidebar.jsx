@@ -84,7 +84,11 @@ export default function HistorySidebar({
         <div className="sidebar-list">
           {history.length === 0 ? (
             <div className="sidebar-empty">
-              <span className="sidebar-empty-icon">&#x29D6;</span>
+              <span className="sidebar-empty-icon">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.5 }}>
+                  <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                </svg>
+              </span>
               <p>No reviews yet</p>
             </div>
           ) : (
