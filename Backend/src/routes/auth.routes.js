@@ -65,7 +65,7 @@ router.get('/github/callback',
   function(req, res) {
     // Successful authentication, redirect to frontend with token
     const token = req.user.token;
-    res.redirect(`http://localhost:5173/?token=${token}`);
+    res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/?token=${token}`);
   }
 );
 
