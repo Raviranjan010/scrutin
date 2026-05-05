@@ -10,11 +10,13 @@ const router = express.Router();
 passport.use(new GitHubStrategy({
     clientID: process.env.GITHUB_CLIENT_ID || 'dummy_id',
     clientSecret: process.env.GITHUB_CLIENT_SECRET || 'dummy_secret',
-    callbackURL: 'http://localhost:3000/auth/github/callback'
+    callbackURL: process.env.BACKEND_URL 
+      ? `${process.env.BACKEND_URL}/auth/github/callback` 
+      : 'http://localhost:3000/auth/github/callback'
   },
-  function(accessToken, refreshToken, profile, done) {
+  async function(accessToken, refreshToken, profile, done) {
     try {
-      const result = githubCallback(profile);
+      const result = await githubCallback(profile);
       return done(null, result);
     } catch (err) {
       return done(err, null);

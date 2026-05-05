@@ -1,1 +1,10 @@
-[]
+[
+  {
+    "id": "1777969493855",
+    "email": "raviranjan01b@gmail.com",
+    "password": "$2b$10$tSmnZF.3OXseoSI72d.ABu2NWimHdNxkuvHvSmNS4UqoNR7Qdzd4a",
+    "isPro": false,
+    "usage": {},
+    "provider": "local"
+  }
+]

@@ -33,6 +33,21 @@ export default function AuthPage() {
           <div className="nav-logo">Sc</div>
           <span className="nav-wordmark">Scrutin</span>
         </div>
+
+        <div className="auth-tabs">
+          <button 
+            className={`auth-tab ${isSignIn ? 'active' : ''}`} 
+            onClick={() => setIsSignIn(true)}
+          >
+            Sign In
+          </button>
+          <button 
+            className={`auth-tab ${!isSignIn ? 'active' : ''}`} 
+            onClick={() => setIsSignIn(false)}
+          >
+            Sign Up
+          </button>
+        </div>
         
         <h1 className="auth-heading">
           {isSignIn ? <><em>Welcome</em> back.</> : <><em>Create</em> account.</>}
@@ -79,12 +94,7 @@ export default function AuthPage() {
           Continue with GitHub
         </button>
 
-        <p className="auth-toggle-text">
-          {isSignIn ? "Don't have an account? " : "Already have an account? "}
-          <button className="auth-toggle-btn" onClick={() => setIsSignIn(!isSignIn)}>
-            {isSignIn ? 'Sign up' : 'Sign in'}
-          </button>
-        </p>
+
       </div>
     </div>
   );
