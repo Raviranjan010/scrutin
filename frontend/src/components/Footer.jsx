@@ -15,7 +15,7 @@ function Footer() {
               <span className="footer__brand-text">Scrutin</span>
             </Link>
             <p className="footer__tagline">
-              Structured code reviews for cleaner patches, safer releases, and calmer pull requests.
+              Structured code reviews for cleaner patches, safer releases, and calmer pull requests. 
             </p>
           </div>
 
