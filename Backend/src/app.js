@@ -12,6 +12,9 @@ app.use(express.json())
 app.get('/', (req, res) => {
     res.send('Hello World')
 })
+// app.get('/', (req, res) => {
+//     res.send('Hello World')
+// })
 
 app.use('/ai', aiRoutes)
 
